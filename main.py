@@ -138,11 +138,13 @@ class Scroll():
         self.scrollSustain = KeySustain(self.scroll_)
         self.strafeSustain = KeySustain(self.strafe)
 
-    def back(self):
-        if self.pointer_index==0 and self.strafe_line > 0:
-            self.strafe_line -=1
-        elif self.pointer_index > 0:
-            self.pointer_index -=1
+
+
+    def isPointerVisible(self):
+        return self.strafe_line<=self.pointer_index<=self.strafe_line+max_linesw
+
+    def pointerMakeVisible(self):
+        self.strafe_line = int(self.pointer_index/max_linesw)*max_linesw
 
     def scroll_(self):
         self.interaction()
@@ -154,17 +156,24 @@ class Scroll():
             self.scroll_line -=1
         elif 0 <= self.pointer_line+self.scrollDir < len(string) :
             self.pointer_line += self.scrollDir
+
+        self.pointer_index = constrain(self.pointer_index, 0,len(string[self.pointer_line]))
+        if not self.isPointerVisible():
+            self.pointerMakeVisible()
+
     def interaction(self):
         self.last_interaction = pygame.time.get_ticks()
         self.blinking = False
 
     def strafe(self):
         self.interaction()
-        if self.strafeDir == 1 and self.pointer_index+1 >= self.strafe_line+max_linesw:
+        if self.strafeDir == 1 and self.pointer_index+1 >= self.strafe_line+max_linesw and self.pointer_index+1 <= len(string[self.pointer_line]):
             self.pointer_index +=1
             self.strafe_line+=1
-
-        else:
+        elif self.strafeDir == -1 and self.pointer_index==self.strafe_line and self.strafe_line >0:
+            self.pointer_index -=1
+            self.strafe_line -=1
+        elif 0 <= self.pointer_index+self.strafeDir <=len(string[self.pointer_line]):
             self.pointer_index += self.strafeDir
 
     def update(self):
@@ -232,7 +241,7 @@ class Text():
             temp  = self.text[self.scroll.pointer_line]
             temp = temp[:self.scroll.pointer_index][:-1]+temp[self.scroll.pointer_index:]
             self.text[self.scroll.pointer_line] = temp
-            self.scroll.back()
+            self.scroll.pointer_index -=1
 
         elif self.scroll.pointer_line > 0:
             length = len(self.text[self.scroll.pointer_line -1])
@@ -266,11 +275,12 @@ class Text():
         assign_max(self.length)
 
     def movePointer(self, mouseLoc):
+        self.scroll.interaction()
         proposedy  = int(mouseLoc[1]/height)
-        proposedx = int((mouseLoc[0])/width)
+        proposedx = int((mouseLoc[0]+width/2)/width)
         if proposedy+self.scroll.scroll_line < self.length:
-            self.scroll.pointer_index = proposedx+self.scroll.strafe_line#-self.scroll.strafe_line
             self.scroll.pointer_line = proposedy+self.scroll.scroll_line
+            self.scroll.pointer_index = constrain(proposedx + self.scroll.strafe_line, 0, len(self.text[self.scroll.pointer_line]))
 
     def show(self):
         for i in range(self.scroll.scroll_line,constrain(self.scroll.scroll_line+max_lines,0,self.length)):
@@ -306,7 +316,44 @@ def shift(character):
 
 translation = (10,10)
 
+I_beam_cursor = (
+    "XXX XXX                 ",
+    "   X                    ",
+    "   X                    ",
+    "   X                    ",
+    "   X                    ",
+    "   X                    ",
+    "   X                    ",
+    "   X                    ",
+    "   X                    ",
+    "   X                    ",
+    "   X                    ",
+    "   X                    ",
+    "   X                    ",
+    "   X                    ",
+    "   X                    ",
+    "XXX XXX                 ",
+    "                        ",
+    "                        ",
+    "                        ",
+    "                        ",
+    "                        ",
+    "                        ",
+    "                        ",
+    "                        "
+)
 
+xormasks, andmasks = pygame.cursors.compile(I_beam_cursor)
+# cursor size
+size = (24, 24)
+
+# point of selection of the cursor
+hotspot = (0, 0)
+
+# custom cursor
+cursor = (size, hotspot, xormasks, andmasks)
+# sets the cursor
+pygame.mouse.set_cursor(*cursor)
 
 
 
@@ -376,6 +423,8 @@ while True:
             if event.button == 5:
                 t.scroll.scrollDir = 1
                 t.scroll.scroll_()
+
+        #elif event.type == MOUSEBUTTONUP:
 
     background.show()
     textDisplay.blit(bg, (0, 0))
